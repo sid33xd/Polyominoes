@@ -1,0 +1,238 @@
+:root {
+  --ink: #4f382d;
+  --ink-soft: rgba(79, 56, 45, 0.72);
+  --panel: rgba(255, 248, 236, 0.8);
+  --panel-strong: rgba(255, 248, 236, 0.95);
+  --line: rgba(122, 90, 63, 0.18);
+  --shadow: 0 18px 48px rgba(108, 84, 51, 0.14);
+  --accent: #d97b43;
+  --accent-deep: #9f4f20;
+  --mint: #dff1e4;
+  --rose: #ffe2ea;
+  --sky: #e5f0ff;
+  --gold: #fff0c5;
+  --button-text: #fffaf2;
+  --font-body: "Trebuchet MS", "Segoe UI Rounded", "Gill Sans", sans-serif;
+  --font-head: "Georgia", "Palatino Linotype", serif;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100vh;
+  width: 100%;
+}
+
+body {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(255, 240, 197, 0.9), transparent 30%),
+    radial-gradient(circle at top right, rgba(229, 240, 255, 0.95), transparent 32%),
+    radial-gradient(circle at bottom left, rgba(255, 226, 234, 0.9), transparent 34%),
+    linear-gradient(180deg, #fffdf8 0%, #f8efe3 100%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.game-root {
+  position: absolute;
+  inset: 0;
+}
+
+.game-root canvas {
+  display: block;
+  touch-action: none;
+}
+
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-band {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.hud-top {
+  top: 18px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.status-pill,
+.control-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.status-label,
+.eyebrow {
+  margin: 0;
+  color: var(--ink-soft);
+  letter-spacing: 0;
+}
+
+.status-cluster {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  pointer-events: auto;
+}
+
+.status-pill {
+  min-width: 116px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  text-align: right;
+}
+
+.status-pill strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.control-strip {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  pointer-events: auto;
+}
+
+.hud-corner {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  pointer-events: none;
+}
+
+.hud-next {
+  position: absolute;
+  left: calc(var(--board-left, 0px) + (var(--board-width, 0px) - 132px) / 2);
+  top: calc(var(--board-top, 0px) + var(--board-height, 0px) + 20px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.hud-next[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.action-button {
+  border: 0;
+  border-radius: 8px;
+  min-height: 44px;
+  min-width: 132px;
+  padding: 0 18px;
+  background: var(--ink);
+  color: var(--button-text);
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease,
+    background 160ms ease;
+}
+
+.action-button:hover {
+  transform: translateY(-1px);
+}
+
+.action-button.secondary {
+  background: rgba(79, 56, 45, 0.14);
+  color: var(--ink);
+}
+
+.action-button.accent {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
+}
+
+.action-button:disabled {
+  cursor: default;
+  opacity: 0.42;
+  transform: none;
+}
+
+@media (max-width: 980px) {
+  .hud-band {
+    left: 14px;
+    right: 14px;
+  }
+
+  .status-cluster {
+    justify-content: flex-start;
+  }
+
+  .hud-corner {
+    top: 14px;
+    right: 14px;
+  }
+
+  .hud-next {
+    left: calc(var(--board-left, 0px) + (var(--board-width, 0px) - 112px) / 2);
+    top: calc(var(--board-top, 0px) + var(--board-height, 0px) + 16px);
+  }
+
+  .control-strip {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .action-button {
+    min-width: 112px;
+  }
+}
+
+@media (max-width: 640px) {
+  .status-cluster {
+    gap: 8px;
+  }
+
+  .status-pill {
+    min-width: 100px;
+    padding: 12px 14px;
+  }
+
+  .control-strip {
+    padding: 10px;
+  }
+}
