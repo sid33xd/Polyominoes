@@ -379,12 +379,17 @@ export class GameScene extends Phaser.Scene {
     const leftPieces = this.snapshot.pieces.filter((_, index) => index % 2 === 0)
     const rightPieces = this.snapshot.pieces.filter((_, index) => index % 2 === 1)
 
-    this.assignAreaSlots(leftPieces, leftArea)
-    this.assignAreaSlots(rightPieces, rightArea)
+    const overflowPieces = [
+      ...this.assignAreaSlots(leftPieces, leftArea),
+      ...this.assignAreaSlots(rightPieces, rightArea),
+    ]
+
+    this.assignHorizontalFallbackSlots(overflowPieces)
   }
 
-  private assignAreaSlots(pieces: PieceSnapshot[], area: RectLike): void {
+  private assignAreaSlots(pieces: PieceSnapshot[], area: RectLike): PieceSnapshot[] {
     let cursorY = area.y
+    const overflowPieces: PieceSnapshot[] = []
 
     for (const piece of pieces) {
       if (this.controller.getPlacement(piece.id) || this.unplacedPositions.has(piece.id)) {
@@ -392,16 +397,111 @@ export class GameScene extends Phaser.Scene {
       }
 
       const bounds = this.getScaledPieceBounds(piece)
+      const fitsWidth = bounds.width <= area.width
+      const fitsHeight = cursorY + bounds.height <= area.y + area.height
+
+      if (!fitsWidth || !fitsHeight) {
+        overflowPieces.push(piece)
+        continue
+      }
+
       const x = Phaser.Math.Clamp(
         area.x + Math.max(0, (area.width - bounds.width) / 2),
-        8,
-        Math.max(8, this.scale.width - bounds.width - 8),
+        area.x,
+        Math.max(area.x, area.x + area.width - bounds.width),
       )
       this.unplacedPositions.set(piece.id, {
         x,
         y: cursorY,
       })
       cursorY += bounds.height + 18
+    }
+
+    return overflowPieces
+  }
+
+  private assignHorizontalFallbackSlots(pieces: PieceSnapshot[]): void {
+    if (pieces.length === 0) {
+      return
+    }
+
+    const margin = 14
+    const topArea = {
+      x: margin,
+      y: this.topClearance,
+      width: this.scale.width - margin * 2,
+      height: Math.max(0, this.boardRect.top - this.topClearance - margin),
+    }
+    const bottomArea = {
+      x: margin,
+      y: this.boardRect.bottom + margin,
+      width: this.scale.width - margin * 2,
+      height: Math.max(0, this.scale.height - this.boardRect.bottom - this.bottomClearance - margin),
+    }
+    const remainingPieces = this.assignHorizontalAreaSlots(pieces, topArea)
+    const finalOverflowPieces = this.assignHorizontalAreaSlots(remainingPieces, bottomArea)
+
+    this.assignForcedVisibleSlots(finalOverflowPieces)
+  }
+
+  private assignHorizontalAreaSlots(pieces: PieceSnapshot[], area: RectLike): PieceSnapshot[] {
+    let cursorX = area.x
+    let cursorY = area.y
+    let rowHeight = 0
+    const overflowPieces: PieceSnapshot[] = []
+
+    for (const piece of pieces) {
+      if (this.controller.getPlacement(piece.id) || this.unplacedPositions.has(piece.id)) {
+        continue
+      }
+
+      const bounds = this.getScaledPieceBounds(piece)
+
+      if (bounds.width > area.width || bounds.height > area.height) {
+        overflowPieces.push(piece)
+        continue
+      }
+
+      if (cursorX > area.x && cursorX + bounds.width > area.x + area.width) {
+        cursorX = area.x
+        cursorY += rowHeight + 14
+        rowHeight = 0
+      }
+
+      if (cursorY + bounds.height > area.y + area.height) {
+        overflowPieces.push(piece)
+        continue
+      }
+
+      this.unplacedPositions.set(piece.id, {
+        x: cursorX,
+        y: cursorY,
+      })
+      cursorX += bounds.width + 14
+      rowHeight = Math.max(rowHeight, bounds.height)
+    }
+
+    return overflowPieces
+  }
+
+  private assignForcedVisibleSlots(pieces: PieceSnapshot[]): void {
+    let cursorY = this.boardRect.bottom + 12
+
+    for (const piece of pieces) {
+      if (this.controller.getPlacement(piece.id) || this.unplacedPositions.has(piece.id)) {
+        continue
+      }
+
+      const bounds = this.getScaledPieceBounds(piece)
+      this.unplacedPositions.set(piece.id, {
+        x: Phaser.Math.Clamp(14, 14, Math.max(14, this.scale.width - bounds.width - 14)),
+        y: Phaser.Math.Clamp(
+          cursorY,
+          this.topClearance,
+          Math.max(this.topClearance, this.scale.height - bounds.height - this.bottomClearance),
+        ),
+      })
+      cursorY += bounds.height + 14
     }
   }
 
