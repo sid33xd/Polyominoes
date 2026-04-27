@@ -1,4 +1,4 @@
-# 🐱 Whisker Fit
+# 🐱 Polyominoes
 
 A Phaser 4 puzzle game.
 
