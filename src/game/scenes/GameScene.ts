@@ -11,6 +11,7 @@ import type {
 type CarryState = {
   pieceId: string
   pointerId: number
+  rotatingPointerId: number | null
   pointerX: number
   pointerY: number
   grabOffsetX: number
@@ -50,6 +51,7 @@ export class GameScene extends Phaser.Scene {
   private pieceViews = new Map<string, PieceView>()
   private carryState: CarryState | null = null
   private unplacedPositions = new Map<string, Point>()
+  private lastTapByPiece = new Map<string, number>()
   private lastCelebratedLevelId: string | null = null
   private topClearance = 120
   private bottomClearance = 32
@@ -184,6 +186,7 @@ export class GameScene extends Phaser.Scene {
     this.carryState = {
       pieceId,
       pointerId: pointer.id,
+      rotatingPointerId: null,
       pointerX: pointer.worldX,
       pointerY: pointer.worldY,
       grabOffsetX: pointer.worldX - pieceView.container.x,
@@ -207,26 +210,44 @@ export class GameScene extends Phaser.Scene {
     const boardBounds = getBounds(level.boardCells)
     const width = this.scale.width
     const height = this.scale.height
+    const isPhonePortrait = width <= 700 && height > width
     const outerPadding = 24
+    const centerGap = isPhonePortrait ? 10 : 18
     const topHudWidth = 228
     const controlWidth = 298
-    const centerGap = 18
-    const leftLaneWidth = Math.max(110, (width - topHudWidth - controlWidth - centerGap * 4) * 0.24)
-    const rightLaneWidth = leftLaneWidth
-    const boardArea = {
-      x: outerPadding + leftLaneWidth + centerGap,
-      y: this.topClearance,
-      width: width - outerPadding * 2 - leftLaneWidth - rightLaneWidth - centerGap * 2,
-      height: height - this.topClearance - this.bottomClearance,
-    }
+    const sideLaneWidth = isPhonePortrait
+      ? Math.max(72, Math.min(104, (width - outerPadding * 2 - 48 * boardBounds.width) / 2))
+      : Math.max(110, (width - topHudWidth - controlWidth - centerGap * 4) * 0.24)
+    const boardArea = isPhonePortrait
+      ? {
+          x: outerPadding + sideLaneWidth + centerGap,
+          y: this.topClearance + Math.max(60, height * 0.14),
+          width: width - outerPadding * 2 - sideLaneWidth * 2 - centerGap * 2,
+          height: Math.min(height * 0.52, height - this.topClearance - this.bottomClearance),
+        }
+      : {
+          x: outerPadding + sideLaneWidth + centerGap,
+          y: this.topClearance,
+          width: width - outerPadding * 2 - sideLaneWidth * 2 - centerGap * 2,
+          height: height - this.topClearance - this.bottomClearance,
+        }
 
-    this.cellSize = Math.floor(
+    const mobileCell = Math.floor(
       Math.min(
-        boardArea.width / (boardBounds.width + 0.9),
+        boardArea.width / boardBounds.width,
         boardArea.height / (boardBounds.height + 1.2),
-        94,
+        54,
       ),
     )
+    this.cellSize = isPhonePortrait
+      ? Math.max(44, mobileCell)
+      : Math.floor(
+          Math.min(
+            boardArea.width / (boardBounds.width + 0.9),
+            boardArea.height / (boardBounds.height + 1.2),
+            94,
+          ),
+        )
     this.trayPieceScale = 0.9
 
     const boardPixelWidth = boardBounds.width * this.cellSize
@@ -306,16 +327,20 @@ export class GameScene extends Phaser.Scene {
       return
     }
 
+    const isPhonePortrait = this.scale.width <= 700 && this.scale.height > this.scale.width
+    const leftX = isPhonePortrait ? 10 : 24
     const leftArea = {
-      x: 24,
+      x: leftX,
       y: this.boardRect.y + 12,
-      width: Math.max(120, this.boardRect.x - 48),
+      width: isPhonePortrait ? Math.max(48, this.boardRect.x - leftX - 10) : Math.max(120, this.boardRect.x - 48),
       height: this.boardRect.height - 24,
     }
     const rightArea = {
-      x: this.boardRect.right + 20,
+      x: this.boardRect.right + (isPhonePortrait ? 10 : 20),
       y: this.boardRect.y + 12,
-      width: Math.max(120, this.scale.width - this.boardRect.right - 44),
+      width: isPhonePortrait
+        ? Math.max(48, this.scale.width - this.boardRect.right - 20)
+        : Math.max(120, this.scale.width - this.boardRect.right - 44),
       height: this.boardRect.height - 24,
     }
 
@@ -335,7 +360,11 @@ export class GameScene extends Phaser.Scene {
       }
 
       const bounds = this.getScaledPieceBounds(piece)
-      const x = area.x + Math.max(0, (area.width - bounds.width) / 2)
+      const x = Phaser.Math.Clamp(
+        area.x + Math.max(0, (area.width - bounds.width) / 2),
+        8,
+        Math.max(8, this.scale.width - bounds.width - 8),
+      )
       this.unplacedPositions.set(piece.id, {
         x,
         y: cursorY,
@@ -461,12 +490,37 @@ export class GameScene extends Phaser.Scene {
         return
       }
 
+      const now = this.time.now
+      const lastTap = this.lastTapByPiece.get(pieceId) ?? -Infinity
+
+      if (!this.carryState && now - lastTap < 280) {
+        this.controller.selectPiece(pieceId)
+        this.controller.rotateSelectedPiece()
+        this.lastTapByPiece.delete(pieceId)
+        return
+      }
+
+      this.lastTapByPiece.set(pieceId, now)
       this.startCarryingPiece(pieceId, cell, x, y + this.cellSize * 0.04, pointer)
     })
     return zone
   }
 
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
+    if (this.carryState && pointer.id !== this.carryState.pointerId && !pointer.rightButtonDown()) {
+      const piece = this.snapshot?.pieces.find((entry) => entry.id === this.carryState?.pieceId)
+
+      if (!piece) {
+        return
+      }
+
+      this.carryState.rotatingPointerId = pointer.id
+      this.rotateCarryGrabOffset(piece)
+      this.controller.rotateSelectedPiece()
+      this.syncPieceViews()
+      return
+    }
+
     if (!this.carryState || pointer.id !== this.carryState.pointerId || !pointer.rightButtonDown()) {
       return
     }
@@ -504,6 +558,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePointerUp(pointer: Phaser.Input.Pointer): void {
+    if (this.carryState?.rotatingPointerId === pointer.id) {
+      this.carryState.rotatingPointerId = null
+      return
+    }
+
     if (!this.carryState || pointer.id !== this.carryState.pointerId || !this.snapshot) {
       return
     }

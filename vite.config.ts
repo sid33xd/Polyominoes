@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 
-export default defineConfig({
-  base: '/whisker-fit/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/whisker-fit/' : '/',
   build: {
     outDir: 'dist',
   },
-})
+}))
