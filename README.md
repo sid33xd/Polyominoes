@@ -19,4 +19,4 @@ npm run dev
 
 Push to `main` branch → GitHub Actions auto-builds and deploys to GitHub Pages.
 
-🔗 Live: https://sid33xd.github.io/whisker-fit
+🔗 Live: https://sid33xd.github.io/Polyominoes
