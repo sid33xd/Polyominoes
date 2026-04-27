@@ -78,6 +78,7 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerup', this.handlePointerUp, this)
     this.input.on('pointerupoutside', this.handlePointerUp, this)
     this.scale.on('resize', this.handleResize, this)
+    this.input.addPointer(Math.max(0, 3 - this.input.manager.pointersTotal))
     this.input.mouse?.disableContextMenu()
 
     this.unsubscribe = this.controller.subscribe((snapshot) => {

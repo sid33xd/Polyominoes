@@ -54,6 +54,9 @@ const game = new Phaser.Game({
     width: 1440,
     height: 900,
   },
+  input: {
+    activePointers: 3,
+  },
   scene: [new GameScene(controller)],
 })
 
