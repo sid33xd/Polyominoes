@@ -52,9 +52,32 @@ export class GameScene extends Phaser.Scene {
   private carryState: CarryState | null = null
   private unplacedPositions = new Map<string, Point>()
   private lastTapByPiece = new Map<string, number>()
+  private rotatedTouchIdentifiers = new Set<number>()
+  private lastCarryRotateAt = -Infinity
   private lastCelebratedLevelId: string | null = null
   private topClearance = 120
   private bottomClearance = 32
+  private readonly handleNativeTouchStart = (event: TouchEvent): void => {
+    if (!this.carryState || event.touches.length < 2 || event.changedTouches.length === 0) {
+      return
+    }
+
+    const touch = event.changedTouches[0]
+
+    if (this.rotatedTouchIdentifiers.has(touch.identifier)) {
+      return
+    }
+
+    this.rotatedTouchIdentifiers.add(touch.identifier)
+    this.rotateCarriedPiece()
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+  private readonly handleNativeTouchEnd = (event: TouchEvent): void => {
+    for (const touch of event.changedTouches) {
+      this.rotatedTouchIdentifiers.delete(touch.identifier)
+    }
+  }
 
   constructor(controller: PuzzleController) {
     super('whisker-fit')
@@ -79,6 +102,11 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerupoutside', this.handlePointerUp, this)
     this.scale.on('resize', this.handleResize, this)
     this.input.addPointer(Math.max(0, 3 - this.input.manager.pointersTotal))
+    this.game.canvas.addEventListener('touchstart', this.handleNativeTouchStart, {
+      passive: false,
+    })
+    this.game.canvas.addEventListener('touchend', this.handleNativeTouchEnd)
+    this.game.canvas.addEventListener('touchcancel', this.handleNativeTouchEnd)
     this.input.mouse?.disableContextMenu()
 
     this.unsubscribe = this.controller.subscribe((snapshot) => {
@@ -92,6 +120,9 @@ export class GameScene extends Phaser.Scene {
       this.input.off('pointerup', this.handlePointerUp, this)
       this.input.off('pointerupoutside', this.handlePointerUp, this)
       this.scale.off('resize', this.handleResize, this)
+      this.game.canvas.removeEventListener('touchstart', this.handleNativeTouchStart)
+      this.game.canvas.removeEventListener('touchend', this.handleNativeTouchEnd)
+      this.game.canvas.removeEventListener('touchcancel', this.handleNativeTouchEnd)
     })
   }
 
@@ -509,16 +540,8 @@ export class GameScene extends Phaser.Scene {
 
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
     if (this.carryState && pointer.id !== this.carryState.pointerId && !pointer.rightButtonDown()) {
-      const piece = this.snapshot?.pieces.find((entry) => entry.id === this.carryState?.pieceId)
-
-      if (!piece) {
-        return
-      }
-
       this.carryState.rotatingPointerId = pointer.id
-      this.rotateCarryGrabOffset(piece)
-      this.controller.rotateSelectedPiece()
-      this.syncPieceViews()
+      this.rotateCarriedPiece()
       return
     }
 
@@ -526,17 +549,9 @@ export class GameScene extends Phaser.Scene {
       return
     }
 
-    const piece = this.snapshot?.pieces.find((entry) => entry.id === this.carryState?.pieceId)
-
-    if (!piece) {
-      return
-    }
-
     this.carryState.pointerX = pointer.worldX
     this.carryState.pointerY = pointer.worldY
-    this.rotateCarryGrabOffset(piece)
-    this.controller.rotateSelectedPiece()
-    this.syncPieceViews()
+    this.rotateCarriedPiece()
   }
 
   private handlePointerMove(pointer: Phaser.Input.Pointer): void {
@@ -778,6 +793,24 @@ export class GameScene extends Phaser.Scene {
       x: this.boardOrigin.x + anchor.x * this.cellSize,
       y: this.boardOrigin.y + anchor.y * this.cellSize,
     }
+  }
+
+  private rotateCarriedPiece(): boolean {
+    if (!this.carryState || !this.snapshot || this.time.now - this.lastCarryRotateAt < 80) {
+      return false
+    }
+
+    const piece = this.snapshot.pieces.find((entry) => entry.id === this.carryState?.pieceId)
+
+    if (!piece) {
+      return false
+    }
+
+    this.lastCarryRotateAt = this.time.now
+    this.rotateCarryGrabOffset(piece)
+    this.controller.rotateSelectedPiece()
+    this.syncPieceViews()
+    return true
   }
 
   private rotateCarryGrabOffset(piece: PieceSnapshot): void {
